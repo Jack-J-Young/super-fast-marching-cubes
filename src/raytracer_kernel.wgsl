@@ -63,7 +63,7 @@ fn sample(pos: vec2<f32>) -> vec4<f32> {
 @compute @workgroup_size(1,1,1)
 fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
 
-    let aliasing_count = 1;
+    let aliasing_count = 8;
 
     let screen_size: vec2<u32> = textureDimensions(color_buffer);
     let chunk_size: vec2<u32> = textureDimensions(chunk_data);
@@ -72,54 +72,20 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
 
     //let transx = ((f32(GlobalInvocationID.x) - f32(screen_size.x)/2.0) * cos(camera.rotation)) * camera.scale + camera.position.x;
     //let transy = ((f32(GlobalInvocationID.y) - f32(screen_size.y)/2.0) * sin(camera.rotation)) * camera.scale + camera.position.y;
+    
     let transformedPosition: vec2<f32> = cameraTransform(vec2<f32>(f32(GlobalInvocationID.x), f32(GlobalInvocationID.y)), vec2<f32>(f32(screen_size.x), f32(screen_size.y)));
-    //((GlobalInvocationID.xy + vec2<u32>(0, 0)) - screen_size/2 * vec2<f32>(cos(camera.rotation), sin(camera.rotation))) * scale
 
+    let length = aliasing_count * aliasing_count;
 
+    var blendedColor: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 0.0);
 
-    let origin = vec2<i32>(i32(transformedPosition.x), i32(transformedPosition.y));
-    //var uv: vec2<f32> = vec2<f32>(f32(GlobalInvocationID.x) / f32(screen_size.x), f32(GlobalInvocationID.y) / f32(screen_size.y));
-
-    //var grid = vec2<f32>(uv.x * f32(i32(chunk_size.x) - 1), uv.y * f32(i32(chunk_size.y) - 1));
-
-
-
-    //chunk_data
-    //textureLoad(chunk_data, vec2<i32>(i32(grid.x), i32(grid.y)), 0);
-
-    let a = textureLoad(chunk_data, origin                  , 0).x;
-    let b = textureLoad(chunk_data, origin + vec2<i32>(1, 0), 0).x;
-    let c = textureLoad(chunk_data, origin + vec2<i32>(0, 1), 0).x;
-    let d = textureLoad(chunk_data, origin + vec2<i32>(1, 1), 0).x;
-
-    // let a = textureLoad(chunk_data, vec2<i32>(i32(grid.x)    , i32(grid.y)    ), 0).x;
-    // let b = textureLoad(chunk_data, vec2<i32>(i32(grid.x) + 1, i32(grid.y)    ), 0).x;
-    // let c = textureLoad(chunk_data, vec2<i32>(i32(grid.x)    , i32(grid.y) + 1), 0).x;
-    // let d = textureLoad(chunk_data, vec2<i32>(i32(grid.x) + 1, i32(grid.y) + 1), 0).x;
-
-    //let a = textureSample(chunk_data, chunk_sampler, GlobalInvocationID.xy).x;
-    //let b = textureSample(chunk_data, chunk_sampler, GlobalInvocationID.xy + vec2<i32>(1, 0)).x;
-    //let c = textureSample(chunk_data, chunk_sampler, GlobalInvocationID.xy + vec2<i32>(0, 1)).x;
-    //let d = textureSample(chunk_data, chunk_sampler, GlobalInvocationID.xy + vec2<i32>(1, 1)).x;
-
-    // let a = 1.0;
-    // let b = 1.0;
-    // let c = 0.8;
-    // let d = 0.2;
-
-    let val: f32 = bilinearInterpolationScalar(transformedPosition.x - f32(origin.x), transformedPosition.y - f32(origin.y), a, b, c, d);
-
-    var colour = vec4<f32>(1.0, 1.0, 1.0, 0.0);
-    //var colour = vec4<f32>(1.0 - val, 1.0 - val, 1.0 - val, 1.0);
-    if (val > 0.5) {
-        colour.x = 0.0;
-        colour.y = 0.0;
-        colour.z = 0.0;
+    for (var i = 0; i < aliasing_count; i++) {
+        for (var j = 0; j < aliasing_count; j++) {
+            
+            let transformedPosition: vec2<f32> = cameraTransform(vec2<f32>(f32(GlobalInvocationID.x), f32(GlobalInvocationID.y)) + vec2<f32>(f32(i),f32(j))/f32(aliasing_count), vec2<f32>(f32(screen_size.x), f32(screen_size.y)));
+            blendedColor = blendedColor + sample(transformedPosition);
+        }
     }
 
-    //pixel_color.x = val;
-    //pixel_color.y = val;
-    //pixel_color.z = val;
-
-    textureStore(color_buffer, screen_pos, colour);
+    textureStore(color_buffer, screen_pos, blendedColor / f32(length));
 }
